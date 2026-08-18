@@ -6,4 +6,6 @@
 .home-recent .section-head p{margin:0 0 6px;font-size:10px;letter-spacing:1.4px;color:var(--muted);font-weight:700}
 .home-recent .section-head button{font-weight:700}
 .home-transaction{width:100%;border:0;background:none;text-align:left;display:grid!important;grid-template-columns:42px 1fr auto!important}
+.home-transaction>span{width:37px!important;height:37px!important;border-radius:12px;display:grid!important;place-items:center;overflow:hidden;align-self:center}
+.home-transaction>span svg{width:18px;height:18px}
 .home-transaction strong{color:var(--ink)}
