@@ -3,6 +3,7 @@
 .home-spent strong{display:block;font:700 40px Manrope;margin:12px 0 5px}
 .home-spent span{font-size:11px;color:#b9bdb4}
 .home-recent{padding:27px 20px 10px}
+.home-recent .section-head{margin-bottom:16px}
 .home-recent .section-head p{margin:0 0 6px;font-size:10px;letter-spacing:1.4px;color:var(--muted);font-weight:700}
 .home-recent .section-head button{font-weight:700}
 .home-transaction{width:100%;border:0;background:none;text-align:left;display:grid!important;grid-template-columns:42px 1fr auto!important}
