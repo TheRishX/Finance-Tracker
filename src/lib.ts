@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
-export type Category = 'Food' | 'Transport' | 'Study' | 'Bills' | 'Fun' | 'Other'
+export type Category = string
+export type SpendingCategory = { id:string; name:string; color:string }
 export type Expense = { id: string; amount: number; category: Category; note: string; spent_at: string; payment_method: 'cash'|'credit_card'; credit_card_id?: string|null }
 export type CreditCard = { id: string; name: string; last_four?: string|null }
 export type WishlistItem = { id: string; name: string; price: number; url?: string; answers: string[]; status: 'thinking' | 'buy' | 'save' }
@@ -70,6 +71,15 @@ export async function loadCreditCards() {
   if (error) throw error
   return (data || []) as CreditCard[]
 }
+const defaultCategories = [{name:'Food',color:'#c7e8a3'},{name:'Transport',color:'#a8d8e8'},{name:'Study',color:'#c9b8ee'},{name:'Bills',color:'#f3cb85'},{name:'Fun',color:'#f2a9b8'},{name:'Other',color:'#c8cbc5'}]
+export async function loadSpendingCategories(userId:string) {
+  const client=requireClient();let {data,error}=await client.from('spending_categories').select('id,name,color').order('created_at');if(error)throw error
+  if(!data?.length){const made=await client.from('spending_categories').insert(defaultCategories.map(c=>({...c,user_id:userId}))).select('id,name,color');if(made.error)throw made.error;data=made.data}
+  return (data||[]) as SpendingCategory[]
+}
+export async function createSpendingCategory(userId:string,name:string,color:string){const {data,error}=await requireClient().from('spending_categories').insert({user_id:userId,name,color}).select('id,name,color').single();if(error)throw error;return data as SpendingCategory}
+export async function updateSpendingCategory(category:SpendingCategory,changes:Pick<SpendingCategory,'name'|'color'>){const client=requireClient();const oldName=category.name;const updated=await client.from('spending_categories').update(changes).eq('id',category.id);if(updated.error)throw updated.error;if(changes.name!==oldName){const moved=await client.from('expenses').update({category:changes.name}).eq('category',oldName);if(moved.error){await client.from('spending_categories').update({name:oldName,color:category.color}).eq('id',category.id);throw moved.error}}}
+export async function deleteSpendingCategory(category:SpendingCategory){const client=requireClient();if(category.name!=='Other'){const moved=await client.from('expenses').update({category:'Other'}).eq('category',category.name);if(moved.error)throw moved.error}const {error}=await client.from('spending_categories').delete().eq('id',category.id);if(error)throw error}
 export async function createCreditCard(userId: string, card: Omit<CreditCard,'id'>) {
   const { data, error } = await requireClient().from('credit_cards').insert({ ...card, user_id:userId }).select('id,name,last_four').single()
   if (error) throw error
