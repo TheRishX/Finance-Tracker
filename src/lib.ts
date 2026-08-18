@@ -112,7 +112,8 @@ export async function deleteExpense(id: string) {
   if (error) throw error
 }
 export async function updateProfile(userId: string, changes: Partial<Profile>) {
-  const { error } = await requireClient().from('profiles').update(changes).eq('user_id', userId)
+  const payload = { ...changes, ...(changes.birth_date === '' ? { birth_date: null } : {}) }
+  const { error } = await requireClient().from('profiles').update(payload).eq('user_id', userId)
   if (error) throw error
 }
 export async function addToFund(id: string, currentBalance: number, amount: number) {
