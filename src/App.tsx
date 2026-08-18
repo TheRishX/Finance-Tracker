@@ -102,6 +102,13 @@ function MorePageV2({profile,email,userId,expenses,cards,onCards,funds,onFunds,o
   </section>
 }
 
+function ProfileForm({profile,authEmail,onSave}:{profile:Profile;authEmail:string;onSave:(p:Partial<Profile>)=>void}) {
+  const [values,setValues]=useState({display_name:profile.display_name,contact_email:profile.contact_email,phone:profile.phone,birth_date:profile.birth_date})
+  const [saved,setSaved]=useState(false)
+  const field=(key:keyof typeof values,value:string)=>{setValues(v=>({...v,[key]:value}));setSaved(false)}
+  return <><p className="eyebrow">OPTIONAL DETAILS</p><h1>Your profile</h1><p className="lead">Add only what you’re comfortable sharing. These details are private to your account.</p><form className="profile-form" onSubmit={e=>{e.preventDefault();onSave(values);setSaved(true)}}><label>Full name<input value={values.display_name} maxLength={80} onChange={e=>field('display_name',e.target.value)} placeholder="Your name"/></label><label>Contact email<input type="email" value={values.contact_email} maxLength={254} onChange={e=>field('contact_email',e.target.value)} placeholder="Optional contact email"/></label><label>Phone number<input type="tel" value={values.phone} maxLength={32} onChange={e=>field('phone',e.target.value)} placeholder="Optional phone number"/></label><label>Date of birth<input type="date" value={values.birth_date} onChange={e=>field('birth_date',e.target.value)}/></label><div className="verified-email"><Mail size={17}/><div><small>LOGIN EMAIL</small><b>{authEmail}</b><span>Managed securely through your sign-in account.</span></div></div><button className="primary wide">Save profile</button>{saved&&<p className="save-confirmation">Profile saved.</p>}</form></>
+}
+
 function AnalyticsDashboard({expenses,currency}:{expenses:Expense[];currency:string}) {
   const [period,setPeriod]=useState('1m'),[from,setFrom]=useState(format(subMonths(new Date(),1),'yyyy-MM-dd')),[to,setTo]=useState(format(new Date(),'yyyy-MM-dd'))
   const end=new Date(), start=period==='1m'?subMonths(end,1):period==='2m'?subMonths(end,2):period==='6m'?subMonths(end,6):period==='1y'?subYears(end,1):period==='2y'?subYears(end,2):startOfDay(new Date(`${from}T00:00:00`))

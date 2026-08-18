@@ -7,5 +7,6 @@ import './auth.css'
 import './dashboard.css'
 import './analytics.css'
 import './home.css'
+import './profile.css'
 registerSW({ immediate: true })
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>)
