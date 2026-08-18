@@ -93,3 +93,37 @@ export function cycleRange(day: number, date = new Date()) {
   return { start, end }
 }
 export const money = (n: number) => `Rs ${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n)}`
+
+type StoredPin = { salt: string; hash: string }
+const pinKey = (userId: string) => `paisa.device-pin.${userId}`
+const bytesToHex = (bytes: Uint8Array) => Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
+
+async function hashPin(pin: string, salt: string) {
+  const data = new TextEncoder().encode(`${salt}:${pin}`)
+  return bytesToHex(new Uint8Array(await crypto.subtle.digest('SHA-256', data)))
+}
+
+export function hasDevicePin(userId: string) {
+  return Boolean(localStorage.getItem(pinKey(userId)))
+}
+
+export async function saveDevicePin(userId: string, pin: string) {
+  if (!/^\d{4}$/.test(pin)) throw new Error('PIN must be exactly 4 digits.')
+  const salt = bytesToHex(crypto.getRandomValues(new Uint8Array(16)))
+  localStorage.setItem(pinKey(userId), JSON.stringify({ salt, hash: await hashPin(pin, salt) } satisfies StoredPin))
+}
+
+export async function verifyDevicePin(userId: string, pin: string) {
+  const raw = localStorage.getItem(pinKey(userId))
+  if (!raw) return true
+  try {
+    const saved = JSON.parse(raw) as StoredPin
+    return (await hashPin(pin, saved.salt)) === saved.hash
+  } catch {
+    return false
+  }
+}
+
+export function removeDevicePin(userId: string) {
+  localStorage.removeItem(pinKey(userId))
+}
