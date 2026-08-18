@@ -26,8 +26,14 @@ export async function loadFinanceData(userId: string) {
   if (profileError) throw profileError
   if (!profile) {
     const created = await client.from('profiles').insert({ user_id: userId, ...defaultProfile }).select('cycle_start_day,monthly_budget,currency,emergency_reminders').single()
-    if (created.error) throw created.error
-    profile = created.data
+    if (created.error?.code === '23505') {
+      const existing = await client.from('profiles').select('cycle_start_day,monthly_budget,currency,emergency_reminders').eq('user_id', userId).single()
+      if (existing.error) throw existing.error
+      profile = existing.data
+    } else {
+      if (created.error) throw created.error
+      profile = created.data
+    }
   }
   const [expenseResult, wishlistResult, fundResult] = await Promise.all([
     client.from('expenses').select('id,amount,category,note,spent_at').order('spent_at', { ascending: false }),
