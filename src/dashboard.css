@@ -1,0 +1,5 @@
+.live-totals{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 16px 0}
+.live-totals>div{padding:16px;background:#fff;border:1px solid #e2e1da;border-radius:16px}
+.live-totals small,.live-totals b{display:block}
+.live-totals small{font-size:9px;letter-spacing:1px;color:var(--muted);margin-bottom:7px}
+.live-totals b{font:700 15px Manrope}

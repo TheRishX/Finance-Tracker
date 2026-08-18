@@ -1,11 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 
 export type Category = 'Food' | 'Transport' | 'Study' | 'Bills' | 'Fun' | 'Other'
-export type Expense = { id: string; amount: number; category: Category; note: string; spent_at: string }
+export type Expense = { id: string; amount: number; category: Category; note: string; spent_at: string; payment_method: 'cash'|'credit_card'; credit_card_id?: string|null }
+export type CreditCard = { id: string; name: string; last_four?: string|null }
 export type WishlistItem = { id: string; name: string; price: number; url?: string; answers: string[]; status: 'thinking' | 'buy' | 'save' }
 export type FundKind = 'savings' | 'mutual_fund' | 'emergency'
 export type Fund = { id: string; name: string; kind: FundKind; balance: number; hidden: boolean }
-export type Profile = { cycle_start_day: number; monthly_budget: number; currency: string; emergency_reminders: boolean }
+export type Profile = { display_name: string; contact_email: string; phone: string; birth_date: string; cycle_start_day: number; monthly_budget: number; currency: string; emergency_reminders: boolean }
 
 const url = import.meta.env.VITE_SUPABASE_URL
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
@@ -13,7 +14,7 @@ export const supabase = url && key ? createClient(url, key, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
 }) : null
 
-export const defaultProfile: Profile = { cycle_start_day: 20, monthly_budget: 12000, currency: 'NPR', emergency_reminders: true }
+export const defaultProfile: Profile = { display_name:'', contact_email:'', phone:'', birth_date:'', cycle_start_day: 20, monthly_budget: 0, currency: 'NPR', emergency_reminders: true }
 
 function requireClient() {
   if (!supabase) throw new Error('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.')
@@ -22,12 +23,13 @@ function requireClient() {
 
 export async function loadFinanceData(userId: string) {
   const client = requireClient()
-  let { data: profile, error: profileError } = await client.from('profiles').select('cycle_start_day,monthly_budget,currency,emergency_reminders').eq('user_id', userId).maybeSingle()
+  const profileFields='display_name,contact_email,phone,birth_date,cycle_start_day,monthly_budget,currency,emergency_reminders'
+  let { data: profile, error: profileError } = await client.from('profiles').select(profileFields).eq('user_id', userId).maybeSingle()
   if (profileError) throw profileError
   if (!profile) {
-    const created = await client.from('profiles').insert({ user_id: userId, ...defaultProfile }).select('cycle_start_day,monthly_budget,currency,emergency_reminders').single()
+    const created = await client.from('profiles').insert({ user_id: userId, ...defaultProfile, contact_email:null, phone:null, birth_date:null }).select(profileFields).single()
     if (created.error?.code === '23505') {
-      const existing = await client.from('profiles').select('cycle_start_day,monthly_budget,currency,emergency_reminders').eq('user_id', userId).single()
+      const existing = await client.from('profiles').select(profileFields).eq('user_id', userId).single()
       if (existing.error) throw existing.error
       profile = existing.data
     } else {
@@ -36,7 +38,7 @@ export async function loadFinanceData(userId: string) {
     }
   }
   const [expenseResult, wishlistResult, fundResult] = await Promise.all([
-    client.from('expenses').select('id,amount,category,note,spent_at').order('spent_at', { ascending: false }),
+    client.from('expenses').select('id,amount,category,note,spent_at,payment_method,credit_card_id').order('spent_at', { ascending: false }),
     client.from('wishlist_items').select('id,name,price,url,reflection_answers,status').order('created_at', { ascending: false }),
     client.from('funds').select('id,name,kind,balance,hidden').order('created_at'),
   ])
@@ -56,11 +58,30 @@ export async function loadFinanceData(userId: string) {
     funds = (created.data || []).map(f => ({ ...f, balance: Number(f.balance) })) as Fund[]
   }
   return {
-    profile: { ...profile, monthly_budget: Number(profile.monthly_budget) } as Profile,
+    profile: { ...profile, display_name:profile.display_name||'', contact_email:profile.contact_email||'', phone:profile.phone||'', birth_date:profile.birth_date||'', monthly_budget: Number(profile.monthly_budget) } as Profile,
     expenses: (expenseResult.data || []).map(e => ({ ...e, amount: Number(e.amount) })) as Expense[],
     wishlist: (wishlistResult.data || []).map(w => ({ id: w.id, name: w.name, price: Number(w.price), url: w.url || undefined, answers: w.reflection_answers as string[], status: w.status })) as WishlistItem[],
     funds,
   }
+}
+
+export async function loadCreditCards() {
+  const { data, error } = await requireClient().from('credit_cards').select('id,name,last_four').order('created_at')
+  if (error) throw error
+  return (data || []) as CreditCard[]
+}
+export async function createCreditCard(userId: string, card: Omit<CreditCard,'id'>) {
+  const { data, error } = await requireClient().from('credit_cards').insert({ ...card, user_id:userId }).select('id,name,last_four').single()
+  if (error) throw error
+  return data as CreditCard
+}
+export async function updateCreditCard(id: string, changes: Partial<Omit<CreditCard,'id'>>) {
+  const { error } = await requireClient().from('credit_cards').update(changes).eq('id',id)
+  if (error) throw error
+}
+export async function deleteCreditCard(id: string) {
+  const { error } = await requireClient().from('credit_cards').delete().eq('id',id)
+  if (error) throw error
 }
 
 export async function createExpense(userId: string, expense: Expense) {
@@ -72,8 +93,22 @@ export async function createWishlistItem(userId: string, item: WishlistItem) {
   const { error } = await requireClient().from('wishlist_items').insert({ ...rest, user_id: userId, reflection_answers: answers })
   if (error) throw error
 }
-export async function updateWishlistStatus(id: string, status: WishlistItem['status']) {
-  const { error } = await requireClient().from('wishlist_items').update({ status }).eq('id', id)
+export async function updateWishlistItem(id: string, changes: Partial<WishlistItem>) {
+  const { answers, ...rest } = changes
+  const payload = answers ? { ...rest, reflection_answers: answers } : rest
+  const { error } = await requireClient().from('wishlist_items').update(payload).eq('id', id)
+  if (error) throw error
+}
+export async function deleteWishlistItem(id: string) {
+  const { error } = await requireClient().from('wishlist_items').delete().eq('id', id)
+  if (error) throw error
+}
+export async function updateExpense(id: string, changes: Partial<Expense>) {
+  const { error } = await requireClient().from('expenses').update(changes).eq('id', id)
+  if (error) throw error
+}
+export async function deleteExpense(id: string) {
+  const { error } = await requireClient().from('expenses').delete().eq('id', id)
   if (error) throw error
 }
 export async function updateProfile(userId: string, changes: Partial<Profile>) {
@@ -84,6 +119,30 @@ export async function addToFund(id: string, currentBalance: number, amount: numb
   const { error } = await requireClient().from('funds').update({ balance: currentBalance + amount }).eq('id', id)
   if (error) throw error
 }
+export async function updateFund(id: string, changes: Partial<Pick<Fund, 'name'|'balance'|'hidden'>>) {
+  const { error } = await requireClient().from('funds').update(changes).eq('id', id)
+  if (error) throw error
+}
+export async function deleteFund(id: string) {
+  const { error } = await requireClient().from('funds').delete().eq('id', id)
+  if (error) throw error
+}
+export async function createFund(userId: string, fund: Pick<Fund, 'name'|'kind'|'balance'|'hidden'>) {
+  const { data, error } = await requireClient().from('funds').insert({ ...fund, user_id: userId }).select('id,name,kind,balance,hidden').single()
+  if (error) throw error
+  return { ...data, balance: Number(data.balance) } as Fund
+}
+export async function resetFinanceData(userId: string) {
+  const client = requireClient()
+  const results = await Promise.all([
+    client.from('expenses').delete().eq('user_id', userId),
+    client.from('wishlist_items').delete().eq('user_id', userId),
+    client.from('funds').update({ balance: 0 }).eq('user_id', userId),
+    client.from('profiles').update({ monthly_budget: 0 }).eq('user_id', userId),
+  ])
+  const failed = results.find(result => result.error)
+  if (failed?.error) throw failed.error
+}
 
 export function cycleRange(day: number, date = new Date()) {
   const d = new Date(date)
@@ -92,7 +151,8 @@ export function cycleRange(day: number, date = new Date()) {
   const end = new Date(start.getFullYear(), start.getMonth() + 1, day - 1, 23, 59, 59)
   return { start, end }
 }
-export const money = (n: number) => `Rs ${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n)}`
+const currencySymbols: Record<string,string> = { NPR:'Rs', USD:'$', INR:'₹', EUR:'€', GBP:'£', AUD:'A$', CAD:'C$', JPY:'¥' }
+export const money = (n: number, currency = 'NPR') => `${currencySymbols[currency] || currency} ${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n)}`
 
 type StoredPin = { salt: string; hash: string }
 const pinKey = (userId: string) => `paisa.device-pin.${userId}`
