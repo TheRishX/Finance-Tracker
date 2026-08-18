@@ -165,36 +165,44 @@ export function cycleRange(day: number, date = new Date()) {
 const currencySymbols: Record<string,string> = { NPR:'Rs', USD:'$', INR:'₹', EUR:'€', GBP:'£', AUD:'A$', CAD:'C$', JPY:'¥' }
 export const money = (n: number, currency = 'NPR') => `${currencySymbols[currency] || currency} ${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n)}`
 
-type StoredPin = { salt: string; hash: string }
+type StoredPin = { salt: string; hash: string; version?: number }
 const pinKey = (userId: string) => `paisa.device-pin.${userId}`
 const bytesToHex = (bytes: Uint8Array) => Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
 
-async function hashPin(pin: string, salt: string) {
+async function legacyHashPin(pin: string, salt: string) {
   const data = new TextEncoder().encode(`${salt}:${pin}`)
   return bytesToHex(new Uint8Array(await crypto.subtle.digest('SHA-256', data)))
 }
+async function hashPin(pin:string,salt:string){const material=await crypto.subtle.importKey('raw',new TextEncoder().encode(pin),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:new TextEncoder().encode(salt),iterations:120000,hash:'SHA-256'},material,256);return bytesToHex(new Uint8Array(bits))}
 
 export function hasDevicePin(userId: string) {
   return Boolean(localStorage.getItem(pinKey(userId)))
 }
+export async function devicePinAvailable(userId:string){const {data,error}=await requireClient().from('profiles').select('pin_hash').eq('user_id',userId).single();if(error)return hasDevicePin(userId);return Boolean(data?.pin_hash)||hasDevicePin(userId)}
 
 export async function saveDevicePin(userId: string, pin: string) {
   if (!/^\d{4}$/.test(pin)) throw new Error('PIN must be exactly 4 digits.')
   const salt = bytesToHex(crypto.getRandomValues(new Uint8Array(16)))
-  localStorage.setItem(pinKey(userId), JSON.stringify({ salt, hash: await hashPin(pin, salt) } satisfies StoredPin))
+  const hash=await hashPin(pin,salt)
+  const {error}=await requireClient().from('profiles').update({pin_salt:salt,pin_hash:hash}).eq('user_id',userId)
+  if(error)throw error
+  localStorage.setItem(pinKey(userId), JSON.stringify({ salt,hash,version:2 } satisfies StoredPin))
 }
 
 export async function verifyDevicePin(userId: string, pin: string) {
   const raw = localStorage.getItem(pinKey(userId))
-  if (!raw) return true
   try {
-    const saved = JSON.parse(raw) as StoredPin
-    return (await hashPin(pin, saved.salt)) === saved.hash
+    const {data,error}=await requireClient().from('profiles').select('pin_salt,pin_hash').eq('user_id',userId).single()
+    if(!error&&data?.pin_salt&&data.pin_hash){const matches=(await hashPin(pin,data.pin_salt))===data.pin_hash;if(matches)localStorage.setItem(pinKey(userId),JSON.stringify({salt:data.pin_salt,hash:data.pin_hash,version:2} satisfies StoredPin));return matches}
+    if(raw){const saved=JSON.parse(raw) as StoredPin;const localHash=saved.version===2?await hashPin(pin,saved.salt):await legacyHashPin(pin,saved.salt);if(localHash===saved.hash){await saveDevicePin(userId,pin);return true}}
+    return false
   } catch {
     return false
   }
 }
 
-export function removeDevicePin(userId: string) {
+export async function removeDevicePin(userId: string) {
+  const {error}=await requireClient().from('profiles').update({pin_salt:null,pin_hash:null}).eq('user_id',userId)
+  if(error)throw error
   localStorage.removeItem(pinKey(userId))
 }

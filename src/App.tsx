@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { format, isWithinInterval, startOfDay, subMonths, subYears } from 'date-fns'
 import { ArrowLeft, ArrowRight, BarChart3, Bell, BookOpen, BriefcaseBusiness, Bus, ChevronRight, CircleEllipsis, CreditCard as CreditCardIcon, Database, Dumbbell, Edit3, Gamepad2, Gift, HeartPulse, Home, House, KeyRound, Landmark, LoaderCircle, LockKeyhole, LogOut, Mail, Plane, Plus, ReceiptText, Search, Settings, Shirt, ShieldCheck, ShoppingBag, ShoppingCart, Smartphone, Sparkles, Trash2, TrendingUp, UserRound, Utensils, WalletCards, X } from 'lucide-react'
 import type { Session } from '@supabase/supabase-js'
-import { Category, CreditCard, Expense, Fund, Profile, SpendingCategory, WishlistItem, createCreditCard, createExpense, createFund, createSpendingCategory, createWishlistItem, cycleRange, defaultProfile, deleteCreditCard, deleteExpense, deleteFund, deleteSpendingCategory, deleteWishlistItem, hasDevicePin, loadCreditCards, loadFinanceData, loadSpendingCategories, money, removeDevicePin, resetFinanceData, saveDevicePin, supabase, updateCreditCard, updateExpense, updateFund, updateProfile, updateSpendingCategory, updateWishlistItem, verifyDevicePin } from './lib'
+import { Category, CreditCard, Expense, Fund, Profile, SpendingCategory, WishlistItem, createCreditCard, createExpense, createFund, createSpendingCategory, createWishlistItem, cycleRange, defaultProfile, deleteCreditCard, deleteExpense, deleteFund, deleteSpendingCategory, deleteWishlistItem, devicePinAvailable, hasDevicePin, loadCreditCards, loadFinanceData, loadSpendingCategories, money, removeDevicePin, resetFinanceData, saveDevicePin, supabase, updateCreditCard, updateExpense, updateFund, updateProfile, updateSpendingCategory, updateWishlistItem, verifyDevicePin } from './lib'
 
 type Tab = 'home' | 'activity' | 'wishlist' | 'more'
 const iconOptions={food:Utensils,transport:Bus,study:BookOpen,bills:ReceiptText,fun:Gamepad2,shopping:ShoppingCart,clothing:Shirt,health:HeartPulse,home:House,travel:Plane,fitness:Dumbbell,work:BriefcaseBusiness,gifts:Gift,technology:Smartphone,other:CircleEllipsis}
@@ -20,7 +20,7 @@ export default function App() {
     const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,next)=>{setSession(next);setChecking(false)})
     return ()=>subscription.unsubscribe()
   },[])
-  useEffect(()=>{if(!session){setLocked(false);setShowPinSetup(false);return}const hasPin=hasDevicePin(session.user.id);setLocked(hasPin);setShowPinSetup(!hasPin&&localStorage.getItem(`paisa.pin-setup-dismissed.${session.user.id}`)!=='1')},[session?.user.id])
+  useEffect(()=>{if(!session){setLocked(false);setShowPinSetup(false);return}let active=true;devicePinAvailable(session.user.id).then(hasPin=>{if(!active)return;setLocked(hasPin);setShowPinSetup(!hasPin&&localStorage.getItem(`paisa.pin-setup-dismissed.${session.user.id}`)!=='1')});return()=>{active=false}},[session?.user.id])
   if(checking)return <LoadingScreen label="Opening your wallet…"/>
   if(!supabase)return <AuthScreen configurationError/>
   if(!session)return <AuthScreen/>
