@@ -3,10 +3,13 @@
 .home-spent strong{display:block;font:700 40px Manrope;margin:12px 0 5px}
 .home-spent span{font-size:11px;color:#b9bdb4}
 .home-recent{padding:27px 20px 10px}
-.home-recent .section-head{margin-bottom:16px}
+.home-recent .section-head{margin-bottom:22px;align-items:flex-end}
 .home-recent .section-head p{margin:0 0 6px;font-size:10px;letter-spacing:1.4px;color:var(--muted);font-weight:700}
 .home-recent .section-head button{font-weight:700}
-.home-transaction{width:100%;border:0;background:none;text-align:left;display:grid!important;grid-template-columns:42px 1fr auto!important}
+.home-recent .transactions{display:grid;gap:8px}
+.home-transaction{width:100%;border:0;border-bottom:1px solid #e5e4dd;background:none;text-align:left;display:grid!important;grid-template-columns:42px minmax(0,1fr) auto!important;gap:12px!important;align-items:center;padding:12px 4px!important;min-height:64px}
+.home-transaction:last-child{border-bottom:0}
+.home-transaction>div{min-width:0}.home-transaction>div b,.home-transaction>div small{display:block}.home-transaction>div small{margin-top:5px;line-height:1.35}.home-transaction>strong{align-self:start;padding-top:2px;white-space:nowrap}
 .home-transaction>span{width:37px!important;height:37px!important;border-radius:12px;display:grid!important;place-items:center;overflow:hidden;align-self:center}
 .home-transaction>span svg{width:18px;height:18px}
 .home-transaction strong{color:var(--ink)}
